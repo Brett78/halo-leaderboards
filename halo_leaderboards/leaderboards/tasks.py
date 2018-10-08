@@ -64,3 +64,46 @@ def populate_leaderboards():
                 actual_rank.save()
 
     return {'player_count': Player.objects.count(), 'rank_count': Rank.objects.count()}
+
+
+@app.task()
+def refresh_active_season():
+    service = HaloService()
+    current_season = Season.objects.get(is_active=True, end_date=None)
+    for playlist in current_season.playlist_set.all():
+        rankings = service.get_top_players(current_season.ref, playlist.ref)
+        results = rankings.get('Results')
+        for player in results:
+            player_name = player.get('Player').get('Gamertag')
+            actual_player, created = Player.objects.get_or_create(gamer_tag=player_name)
+            score = player.get('Score')
+            rank = score.get('Rank')
+            csr = score.get('Csr')
+            tier = score.get('Tier')
+            designation_ref = score.get('DesignationId')
+            designation = Designation.objects.get(ref=designation_ref)
+            actual_tier = Tier.objects.get(designation=designation, level=tier)
+
+            # Could be current player or someone else
+            try:
+                existing_rank = Rank.objects.get(season=current_season, playlist=playlist, rank=rank)
+                if existing_rank:
+                    existing_rank.delete()
+            except:
+                pass
+
+            # If it wasn't the current player, but they have a rank, just update it
+            try:
+                current_rank = Rank.objects.get(player=actual_player, season=current_season, playlist=playlist)
+                if current_rank and current_rank.rank != rank:
+                    current_rank.rank = rank
+                    current_rank.save()
+                    continue
+            except:
+                pass
+
+            actual_rank = Rank(tier=actual_tier, player=actual_player, csr=csr, rank=rank, playlist=playlist,
+                               season=current_season)
+            actual_rank.save()
+
+    return {'player_count': Player.objects.count(), 'rank_count': Rank.objects.count()}
