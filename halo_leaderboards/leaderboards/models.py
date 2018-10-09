@@ -39,7 +39,4 @@ class Rank(models.Model):
     rank = models.IntegerField(db_index=True)
 
     class Meta:
-        unique_together = (('player', 'playlist', 'season'), ('playlist', 'season', 'rank'))
-
-
-
+        unique_together = (('player', 'playlist', 'season'),)
