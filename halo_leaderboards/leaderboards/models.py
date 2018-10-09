@@ -40,6 +40,3 @@ class Rank(models.Model):
 
     class Meta:
         unique_together = (('player', 'playlist', 'season'),)
-
-
-
